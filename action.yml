@@ -1,0 +1,71 @@
+name: Setup GoogleTest
+description: An GitHub Action which sets up your workflow with specified version of GoogleTest.
+author: Hidekazu TAKAHASHI(Bacondish2023)
+inputs:
+  tag:
+    description: Tag or branch name. Default is latest main.
+    required: false
+    default: main
+  build-type:
+    description: Build type. One of {Debug, Release, RelWithDebInfo, MinSizeRel}. Default is Release.
+    required: false
+    default: Release
+  loglevel:
+    description: Logging level. One of {OFF, CRITICAL, ERROR, WARNING, INFO, DEBUG}. Default is INFO.
+    required: false
+    default: INFO
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+
+    # The google_test_installer installs in /usr/local/ on Linux, macOS platforms.
+    # In detail, header files are installed in /usr/local/include.
+    # And library files are installed in /usr/local/lib.
+    #
+    # The CMake's FindGTest cannot find GoogleMock library however it can find GoogleTest.
+    # So, the GoogleMock library needed to be added to library path.
+    - name: Install
+      if: (runner.os == 'Linux') || (runner.os == 'macOs')
+      run:  |
+            pushd google_test_installer
+            sudo python -B -m google_test_installer --branch ${{ inputs.tag }} --build_type ${{ inputs.build-type }} --loglevel ${{ inputs.loglevel }}
+            popd
+            echo "LIBRARY_PATH=${LIBRARY_PATH}:/usr/local/lib" >> ${GITHUB_ENV}
+      shell: bash
+
+    # The google_test_installer installs in Env[USERPROFILE] on Windows platform.
+    # In detail, header files are installed in Env[USERPROFILE]\include.
+    # And library files are installed in Env[USERPROFILE]\lib.
+    #
+    # Env[USERPROFILE] is not in search path of CMake's find_package.
+    # And CMake searches the PATH environment variable
+    # (If "*/bin" is stored, CMake searches its parent path.)
+    # So, this action adds Env[USERPROFILE]\bin to PATH and creates the directory.
+    #
+    # The CMake's FindGTest cannot find GoogleMock library however it can find GoogleTest.
+    # So, the GoogleMock library needed to be added to library path.
+    - name: Install
+      if: runner.os == 'Windows'
+      run:  |
+            pushd google_test_installer
+            python -B -m google_test_installer --branch ${{ inputs.tag }} --build_type ${{ inputs.build-type }} --loglevel ${{ inputs.loglevel }}
+            popd
+            if ( Test-Path -Path "${env:USERPROFILE}\bin" )
+            {
+                echo "Directory ${env:USERPROFILE}\bin already exists. Skip creation."
+            }
+            else
+            {
+                echo "Create ${env:USERPROFILE}\bin"
+                mkdir "${env:USERPROFILE}\bin"
+            }
+            echo "${env:USERPROFILE}\bin" | Out-File -FilePath ${env:GITHUB_PATH} -Encoding utf8 -Append
+            echo "LIB=${env:LIB};${env:USERPROFILE}\lib" | Out-File -FilePath ${env:GITHUB_ENV} -Encoding utf8 -Append
+      shell: pwsh
+branding:
+  icon: code
+  color: blue

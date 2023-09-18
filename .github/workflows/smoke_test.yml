@@ -1,0 +1,102 @@
+name: SmokeTest
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  BUILD_DIR: zzz_build
+
+jobs:
+  UnitTest:
+    strategy:
+      matrix:
+#        platform: ['ubuntu-latest', 'windows-latest', 'macos-latest']
+        platform: ['ubuntu-latest']
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout VCS
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Unit Test
+        run: python -B -m unittest --verbose
+        working-directory: google_test_installer
+
+  IntegrationTest:
+    strategy:
+      matrix:
+        platform: ['ubuntu-latest', 'windows-latest', 'macos-latest']
+#        platform: ['windows-latest', 'macos-latest']
+#        googletest-version: ['release-1.12.0', 'v1.14.0']
+        googletest-version: ['release-1.12.0']
+#        build-type: ['Release', 'Debug']
+        build-type: ['Release']
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout VCS
+        uses: actions/checkout@v3
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install GoogleTest
+        uses: ./
+        with:
+          tag: ${{ matrix.googletest-version }}
+          build-type: ${{ matrix.build-type }}
+          loglevel: 'DEBUG'
+      - name: Test Example
+        if: (runner.os == 'Linux') || (runner.os == 'macOs')
+        run:    |
+                mkdir ${{ env.BUILD_DIR }}
+                pushd ${{ env.BUILD_DIR }}
+                cmake -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "Unix Makefiles" ..
+                make
+                make test
+                popd
+      - name: Test Example
+        if: runner.os == 'Windows'
+        run:    |
+                mkdir ${{ env.BUILD_DIR }}
+                pushd ${{ env.BUILD_DIR }}
+                cmake -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "NMake Makefiles" ..
+                nmake
+                nmake test
+                popd
+
+  # A test case that following directories are already exist.
+  # - ${env:USERPROFILE}\bin
+  # - ${env:USERPROFILE}\include
+  # - ${env:USERPROFILE}\lib
+  IntegrationTestMisc:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout VCS
+        uses: actions/checkout@v3
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup Test Case
+        run:    |
+                mkdir "${env:USERPROFILE}\bin"
+                mkdir "${env:USERPROFILE}\include"
+                mkdir "${env:USERPROFILE}\lib"
+      - name: Install GoogleTest
+        uses: ./
+        with:
+          tag: v1.14.0
+          build-type: Release
+          loglevel: DEBUG
+      - name: Test Example
+        run:    |
+                mkdir ${{ env.BUILD_DIR }}
+                pushd ${{ env.BUILD_DIR }}
+                cmake -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..
+                nmake
+                nmake test
+                popd

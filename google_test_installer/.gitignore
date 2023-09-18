@@ -1,0 +1,7 @@
+# Python cache
+__pycache__/
+
+# Temporary directory. Created by Python setuptools.
+build/
+dist/
+google_test_installer.egg-info/

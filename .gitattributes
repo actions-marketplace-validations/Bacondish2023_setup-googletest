@@ -1,0 +1,12 @@
+*	text=auto
+
+*.c	text
+*.h	text
+*.cpp	text
+*.hpp	text
+
+*.md	text
+*.puml	text
+
+*.sh	text
+*.bat	text
